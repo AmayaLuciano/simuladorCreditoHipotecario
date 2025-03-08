@@ -153,7 +153,7 @@ export function MortgageCalculator({ onCalculate, showPrepaymentOptions, setShow
                                         placeholder="Ingrese la frecuencia de precancelamiento"
                                     />
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-2 mb-3.5">
                                     <Label htmlFor="prepaymentFeePercentage">Comisión por Precancelación (%)</Label>
                                     <Input
                                         id="prepaymentFeePercentage"
@@ -170,7 +170,7 @@ export function MortgageCalculator({ onCalculate, showPrepaymentOptions, setShow
                 </CardContent>
                 <CardFooter>
                     <Button disabled={calculateBtnIsEnabled()} type="submit" className="w-full">
-                        Calculate
+                        Calcular
                     </Button>
                 </CardFooter>
             </form>
