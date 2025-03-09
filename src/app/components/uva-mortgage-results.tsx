@@ -91,7 +91,6 @@ export function UvaMortgageResults({ results }: UvaMortgageResultsProps) {
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead>Fecha</TableHead>
                                                     <TableHead>Monto ($)</TableHead>
                                                     <TableHead>Equivalente (UVAs)</TableHead>
                                                 </TableRow>
@@ -99,7 +98,6 @@ export function UvaMortgageResults({ results }: UvaMortgageResultsProps) {
                                             <TableBody>
                                                 {results.pastPrepayments.map((prepayment, index) => (
                                                     <TableRow key={index}>
-                                                        <TableCell>{prepayment.date}</TableCell>
                                                         <TableCell>{formatCurrency(prepayment.amount)}</TableCell>
                                                         <TableCell>{formatNumber(prepayment.uvaAmount, 2)} UVAs</TableCell>
                                                     </TableRow>

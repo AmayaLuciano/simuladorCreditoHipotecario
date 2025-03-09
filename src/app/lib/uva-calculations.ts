@@ -58,6 +58,41 @@ export function simulateExistingUvaMortgage(params: UvaMortgageParams): UvaMortg
         return new Date(a.date).getTime() - new Date(b.date).getTime()
     })
 
+    // Si hay una sola precancelación grande (posiblemente del modo "total"),
+    // distribuirla proporcionalmente a lo largo del tiempo ya pagado
+    if (
+        processedPastPrepayments.length === 1 &&
+        processedPastPrepayments[0].amount > monthlyUvaPayment * currentUvaValue * 3
+    ) {
+        const singlePrepayment = processedPastPrepayments[0]
+        processedPastPrepayments.length = 0 // Limpiar el array
+
+        // Distribuir en hasta 4 pagos a lo largo del período ya pagado
+        const numPayments = Math.min(4, Math.floor(paidInstallments / 3))
+        if (numPayments > 0) {
+            const amountPerPayment = singlePrepayment.amount / numPayments
+            const uvaAmountPerPayment = singlePrepayment.uvaAmount / numPayments
+
+            for (let i = 0; i < numPayments; i++) {
+                // Distribuir las fechas uniformemente en el período pagado
+                const paymentMonth = Math.floor((paidInstallments * (i + 1)) / (numPayments + 1))
+                const paymentDate = addMonths(startDate, paymentMonth)
+
+                processedPastPrepayments.push({
+                    date: format(paymentDate, "dd/MM/yyyy"),
+                    amount: amountPerPayment,
+                    uvaAmount: uvaAmountPerPayment,
+                })
+            }
+        } else {
+            // Si no hay suficientes cuotas pagadas, mantener la precancelación única
+            processedPastPrepayments.push(singlePrepayment)
+        }
+    }
+
+    // Crear una copia de las precancelaciones procesadas para usar en los cálculos
+    const workingPastPrepayments = [...processedPastPrepayments]
+
     // Calcular saldo pendiente en UVAs considerando precancelaciones pasadas
     let remainingUvaBalance = uvaAmount
     let remainingUvaBalanceWithoutPrepayments = uvaAmount
@@ -80,8 +115,10 @@ export function simulateExistingUvaMortgage(params: UvaMortgageParams): UvaMortg
         remainingUvaBalanceWithoutPrepayments -= principalWithoutPrepayments
 
         // Aplicar precancelaciones pasadas si corresponde
-        for (const prepayment of processedPastPrepayments) {
+        for (let j = 0; j < workingPastPrepayments.length; j++) {
+            const prepayment = workingPastPrepayments[j]
             const prepaymentDate = new Date(prepayment.date)
+
             if (
                 isBefore(prepaymentDate, paymentDate) ||
                 format(prepaymentDate, "yyyy-MM") === format(paymentDate, "yyyy-MM")
@@ -90,8 +127,8 @@ export function simulateExistingUvaMortgage(params: UvaMortgageParams): UvaMortg
                 totalPastPrepaymentUvas += prepayment.uvaAmount
 
                 // Eliminar esta precancelación para no procesarla nuevamente
-                processedPastPrepayments.splice(processedPastPrepayments.indexOf(prepayment), 1)
-                i-- // Ajustar el índice ya que modificamos el array
+                workingPastPrepayments.splice(j, 1)
+                j-- // Ajustar el índice ya que modificamos el array
                 break
             }
         }
@@ -103,43 +140,66 @@ export function simulateExistingUvaMortgage(params: UvaMortgageParams): UvaMortg
     // Calcular el ahorro de tiempo e intereses por precancelaciones pasadas
     const totalPastPrepayments = pastPrepayments.reduce((sum, p) => sum + p.amount, 0)
 
-    // Simulación sin precancelaciones para calcular el ahorro
-    let monthsWithoutPrepayments = 0
-    let interestWithoutPrepayments = 0
-    let balanceWithoutPrepayments = remainingUvaBalanceWithoutPrepayments
+    // Simulación completa sin precancelaciones para calcular el ahorro total
+    let fullSimulationBalanceWithoutPrepayments = uvaAmount
+    let fullSimulationMonthsWithoutPrepayments = 0
+    let fullSimulationInterestWithoutPrepayments = 0
 
-    while (balanceWithoutPrepayments > 0 && monthsWithoutPrepayments < totalMonths) {
-        monthsWithoutPrepayments++
-        const interestForMonth = balanceWithoutPrepayments * monthlyInterestRate
+    while (fullSimulationBalanceWithoutPrepayments > 0 && fullSimulationMonthsWithoutPrepayments < totalMonths) {
+        fullSimulationMonthsWithoutPrepayments++
+        const interestForMonth = fullSimulationBalanceWithoutPrepayments * monthlyInterestRate
+        fullSimulationInterestWithoutPrepayments += interestForMonth
+
         const principalForMonth = monthlyUvaPayment - interestForMonth
-
-        interestWithoutPrepayments += interestForMonth
-        balanceWithoutPrepayments -= principalForMonth
-
-        if (balanceWithoutPrepayments <= 0) break
+        fullSimulationBalanceWithoutPrepayments -= principalForMonth
     }
 
-    // Simulación con precancelaciones para calcular el ahorro
-    let monthsWithPrepayments = 0
-    let interestWithPrepayments = 0
-    let balanceWithPrepayments = remainingUvaBalance
+    // Simulación completa con precancelaciones para calcular el ahorro total
+    let fullSimulationBalanceWithPrepayments = uvaAmount
+    let fullSimulationMonthsWithPrepayments = 0
+    let fullSimulationInterestWithPrepayments = 0
+    const fullSimulationPastPrepayments = [...processedPastPrepayments]
 
-    while (balanceWithPrepayments > 0 && monthsWithPrepayments < totalMonths) {
-        monthsWithPrepayments++
-        const interestForMonth = balanceWithPrepayments * monthlyInterestRate
+    for (let month = 1; month <= totalMonths; month++) {
+        if (fullSimulationBalanceWithPrepayments <= 0) break
+
+        fullSimulationMonthsWithPrepayments++
+        const paymentDate = addMonths(startDate, month - 1)
+
+        const interestForMonth = fullSimulationBalanceWithPrepayments * monthlyInterestRate
+        fullSimulationInterestWithPrepayments += interestForMonth
+
         const principalForMonth = monthlyUvaPayment - interestForMonth
+        fullSimulationBalanceWithPrepayments -= principalForMonth
 
-        interestWithPrepayments += interestForMonth
-        balanceWithPrepayments -= principalForMonth
+        // Aplicar precancelaciones pasadas
+        for (let j = 0; j < fullSimulationPastPrepayments.length; j++) {
+            const prepayment = fullSimulationPastPrepayments[j]
+            const prepaymentDate = new Date(prepayment.date)
 
-        if (balanceWithPrepayments <= 0) break
+            if (
+                isBefore(prepaymentDate, paymentDate) ||
+                format(prepaymentDate, "yyyy-MM") === format(paymentDate, "yyyy-MM")
+            ) {
+                fullSimulationBalanceWithPrepayments -= prepayment.uvaAmount
+
+                // Eliminar esta precancelación para no procesarla nuevamente
+                fullSimulationPastPrepayments.splice(j, 1)
+                j-- // Ajustar el índice ya que modificamos el array
+                break
+            }
+        }
+
+        fullSimulationBalanceWithPrepayments = Math.max(0, fullSimulationBalanceWithPrepayments)
     }
 
-    const timeAlreadySavedMonths = monthsWithoutPrepayments - monthsWithPrepayments
-    const interestAlreadySaved = (interestWithoutPrepayments - interestWithPrepayments) * currentUvaValue
+    // Calcular el ahorro total de tiempo e intereses
+    const timeAlreadySavedMonths = fullSimulationMonthsWithoutPrepayments - fullSimulationMonthsWithPrepayments
+    const interestAlreadySaved =
+        (fullSimulationInterestWithoutPrepayments - fullSimulationInterestWithPrepayments) * currentUvaValue
 
-    // Calcular meses restantes
-    const remainingMonths = totalMonths - paidInstallments - timeAlreadySavedMonths
+    // Calcular meses restantes considerando el ahorro por precancelaciones
+    const remainingMonths = Math.max(0, fullSimulationMonthsWithPrepayments - paidInstallments)
 
     // Calcular montos en pesos
     const originalLoanAmount = uvaAmount * INITIAL_UVA_VALUE
@@ -226,11 +286,10 @@ export function simulateExistingUvaMortgage(params: UvaMortgageParams): UvaMortg
     // Generar datos mensuales
     const monthlyData: UvaMonthlyData[] = []
     let simulationBalance = uvaAmount
-    const currentMonth = 1
 
     // Mapa para precancelaciones pasadas por fecha
     const pastPrepaymentsByDate = new Map<string, number>()
-    if (pastPrepayments) {
+    if (pastPrepayments.length > 0) {
         pastPrepayments.forEach((prepayment) => {
             const dateKey = format(prepayment.date, "yyyy-MM")
             const existingAmount = pastPrepaymentsByDate.get(dateKey) || 0

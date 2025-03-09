@@ -36,7 +36,7 @@ export function UvaMortgageAnalyzer({
     const [newPrepaymentDate, setNewPrepaymentDate] = useState<Date | undefined>(undefined)
 
     // Estados para el modo de precancelación
-    const [prepaymentMode, setPrepaymentMode] = useState<"detailed" | "total">("detailed")
+    const [prepaymentMode, setPrepaymentMode] = useState<"detailed" | "total">("total")
     const [totalPrepaymentAmount, setTotalPrepaymentAmount] = useState<number | any>(undefined)
     const [totalPrepaymentUnit, setTotalPrepaymentUnit] = useState<"pesos" | "uvas">("pesos")
 
@@ -460,34 +460,12 @@ export function UvaMortgageAnalyzer({
                     </div>
 
                     {/* Sección de Precancelaciones Pasadas */}
-                    <Separator className="my-4" />
-                    <div className="space-y-4">
+                    <Separator className="my-2" />
+                    <div className="space-y-2">
                         <h3 className="text-lg font-medium">Precancelaciones Realizadas</h3>
 
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="flex space-x-4">
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="radio"
-                                        id="mode-detailed"
-                                        name="prepayment-mode"
-                                        className="h-4 w-4 text-primary border-primary rounded focus:ring-primary"
-                                        checked={prepaymentMode === "detailed"}
-                                        onChange={() => setPrepaymentMode("detailed")}
-                                    />
-                                    <Label htmlFor="mode-detailed">Detallado</Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="radio"
-                                        id="mode-total"
-                                        name="prepayment-mode"
-                                        className="h-4 w-4 text-primary border-primary rounded focus:ring-primary"
-                                        checked={prepaymentMode === "total"}
-                                        onChange={() => setPrepaymentMode("total")}
-                                    />
-                                    <Label htmlFor="mode-total">Monto Total</Label>
-                                </div>
                             </div>
 
                             {prepaymentMode === "detailed" ? (
