@@ -14,3 +14,9 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs))
 }
 
+export function formatNumber(value: number, decimals = 0): string {
+    return new Intl.NumberFormat("es-AR", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    }).format(value)
+}
